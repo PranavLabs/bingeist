@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import getDb from '@/lib/db';
+import pool, { ensureSchema } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
 
 export async function GET(
@@ -7,19 +7,34 @@ export async function GET(
   { params }: { params: Promise<{ username: string }> }
 ) {
   const { username } = await params;
-  const db = getDb();
+  await ensureSchema();
 
-  const user = db.prepare(
-    'SELECT id, username, bio, avatar_url, created_at FROM users WHERE username = ?'
-  ).get(username) as { id: number; username: string; bio: string; avatar_url: string; created_at: string } | undefined;
+  const { rows } = await pool.query<{
+    id: number;
+    username: string;
+    bio: string;
+    avatar_url: string;
+    created_at: string;
+  }>(
+    'SELECT id, username, bio, avatar_url, created_at FROM users WHERE username = $1',
+    [username]
+  );
+  const user = rows[0];
 
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
+  const [watchingRes, completedRes, planRes, postsRes] = await Promise.all([
+    pool.query<{ c: string }>("SELECT COUNT(*) AS c FROM watchlist_items WHERE user_id = $1 AND status = 'watching'", [user.id]),
+    pool.query<{ c: string }>("SELECT COUNT(*) AS c FROM watchlist_items WHERE user_id = $1 AND status = 'completed'", [user.id]),
+    pool.query<{ c: string }>("SELECT COUNT(*) AS c FROM watchlist_items WHERE user_id = $1 AND status = 'plan_to_watch'", [user.id]),
+    pool.query<{ c: string }>('SELECT COUNT(*) AS c FROM posts WHERE user_id = $1', [user.id]),
+  ]);
+
   const stats = {
-    watching: (db.prepare("SELECT COUNT(*) as c FROM watchlist_items WHERE user_id = ? AND status = 'watching'").get(user.id) as { c: number }).c,
-    completed: (db.prepare("SELECT COUNT(*) as c FROM watchlist_items WHERE user_id = ? AND status = 'completed'").get(user.id) as { c: number }).c,
-    plan_to_watch: (db.prepare("SELECT COUNT(*) as c FROM watchlist_items WHERE user_id = ? AND status = 'plan_to_watch'").get(user.id) as { c: number }).c,
-    posts: (db.prepare("SELECT COUNT(*) as c FROM posts WHERE user_id = ?").get(user.id) as { c: number }).c,
+    watching: parseInt(watchingRes.rows[0].c, 10),
+    completed: parseInt(completedRes.rows[0].c, 10),
+    plan_to_watch: parseInt(planRes.rows[0].c, 10),
+    posts: parseInt(postsRes.rows[0].c, 10),
   };
 
   return NextResponse.json({ user, stats });
@@ -37,11 +52,10 @@ export async function PATCH(
 
   const { bio, avatar_url } = await req.json();
 
-  const db = getDb();
-  db.prepare('UPDATE users SET bio = ?, avatar_url = ? WHERE id = ?').run(
-    bio ?? '',
-    avatar_url ?? '',
-    session.userId
+  await ensureSchema();
+  await pool.query(
+    'UPDATE users SET bio = $1, avatar_url = $2 WHERE id = $3',
+    [bio ?? '', avatar_url ?? '', session.userId]
   );
 
   return NextResponse.json({ message: 'Profile updated' });

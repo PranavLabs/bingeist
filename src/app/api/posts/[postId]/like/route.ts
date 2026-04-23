@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import getDb from '@/lib/db';
+import pool, { ensureSchema } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
 
 export async function POST(
@@ -10,20 +10,29 @@ export async function POST(
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { postId } = await params;
-  const db = getDb();
+  await ensureSchema();
 
-  const post = db.prepare('SELECT id FROM posts WHERE id = ?').get(postId);
-  if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
+  const { rows: postRows } = await pool.query('SELECT id FROM posts WHERE id = $1', [postId]);
+  if (!postRows[0]) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
 
-  const existing = db.prepare('SELECT 1 FROM post_likes WHERE user_id = ? AND post_id = ?').get(session.userId, postId);
+  const { rows: existing } = await pool.query(
+    'SELECT 1 FROM post_likes WHERE user_id = $1 AND post_id = $2',
+    [session.userId, postId]
+  );
 
-  if (existing) {
-    db.prepare('DELETE FROM post_likes WHERE user_id = ? AND post_id = ?').run(session.userId, postId);
-    const count = (db.prepare('SELECT COUNT(*) as c FROM post_likes WHERE post_id = ?').get(postId) as { c: number }).c;
-    return NextResponse.json({ liked: false, like_count: count });
+  if (existing.length > 0) {
+    await pool.query('DELETE FROM post_likes WHERE user_id = $1 AND post_id = $2', [session.userId, postId]);
+    const { rows } = await pool.query<{ c: string }>(
+      'SELECT COUNT(*) AS c FROM post_likes WHERE post_id = $1',
+      [postId]
+    );
+    return NextResponse.json({ liked: false, like_count: parseInt(rows[0].c, 10) });
   } else {
-    db.prepare('INSERT INTO post_likes (user_id, post_id) VALUES (?, ?)').run(session.userId, postId);
-    const count = (db.prepare('SELECT COUNT(*) as c FROM post_likes WHERE post_id = ?').get(postId) as { c: number }).c;
-    return NextResponse.json({ liked: true, like_count: count });
+    await pool.query('INSERT INTO post_likes (user_id, post_id) VALUES ($1, $2)', [session.userId, postId]);
+    const { rows } = await pool.query<{ c: string }>(
+      'SELECT COUNT(*) AS c FROM post_likes WHERE post_id = $1',
+      [postId]
+    );
+    return NextResponse.json({ liked: true, like_count: parseInt(rows[0].c, 10) });
   }
 }

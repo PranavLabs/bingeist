@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import getDb from '@/lib/db';
+import pool, { ensureSchema } from '@/lib/db';
 import { signToken, COOKIE_NAME } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
@@ -11,10 +11,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
-    const db = getDb();
-    const user = db.prepare('SELECT id, username, password_hash FROM users WHERE email = ?').get(email) as
-      | { id: number; username: string; password_hash: string }
-      | undefined;
+    await ensureSchema();
+    const { rows } = await pool.query<{ id: number; username: string; password_hash: string }>(
+      'SELECT id, username, password_hash FROM users WHERE email = $1',
+      [email]
+    );
+    const user = rows[0];
 
     if (!user) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });

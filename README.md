@@ -22,7 +22,7 @@ npm install
 
 ### 2. Configure environment variables
 
-Copy the example file and fill in your API key:
+Copy the example file and fill in your values:
 
 ```bash
 cp .env.local.example .env.local
@@ -31,6 +31,9 @@ cp .env.local.example .env.local
 Edit `.env.local`:
 
 ```
+# Postgres connection string (e.g. from Neon: https://neon.tech)
+DATABASE_URL=postgres://USER:PASSWORD@HOST/DBNAME?sslmode=require
+
 # Get from https://www.themoviedb.org/settings/api
 # Use the "API Read Access Token" (v4 Bearer token)
 TMDB_API_KEY=your_tmdb_bearer_token_here
@@ -42,6 +45,8 @@ JWT_SECRET=your-random-secret-here
 > **Jikan (MyAnimeList)** is a free public API — no key needed.
 >
 > **TMDB** requires a free account and a v4 Read Access Token. Get one at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api).
+>
+> **DATABASE_URL** requires a Postgres database. For local development you can run Postgres locally or use a free hosted option like [Neon](https://neon.tech). The schema is created automatically on first request.
 
 ### 3. Run the development server
 
@@ -58,11 +63,39 @@ npm run build
 npm start
 ```
 
+## Deploying to Vercel + Neon (free tier)
+
+### Step 1 — Create a free Neon Postgres database
+
+1. Sign up at [neon.tech](https://neon.tech) (free tier available).
+2. Create a new project.
+3. Copy the connection string from the dashboard — it looks like:
+   ```
+   postgres://USER:PASSWORD@HOST/DBNAME?sslmode=require
+   ```
+   This is your `DATABASE_URL`.
+
+> **Note:** File-based SQLite is not compatible with Vercel's serverless runtime because the filesystem is ephemeral. This project uses Postgres for persistent storage.
+
+### Step 2 — Deploy to Vercel
+
+1. Push this repository to GitHub.
+2. Go to [vercel.com](https://vercel.com) → **New Project** → import your GitHub repo.
+3. In the Vercel project dashboard go to **Settings → Environment Variables** and add:
+
+   | Name | Value |
+   |------|-------|
+   | `DATABASE_URL` | Your Neon connection string |
+   | `TMDB_API_KEY` | Your TMDB v4 Read Access Token |
+   | `JWT_SECRET` | A long random string (e.g. `openssl rand -hex 32`) |
+
+4. Click **Deploy**. The database schema is created automatically on first request.
+
 ## Tech Stack
 
 - **Next.js 16** (App Router, API Routes)
 - **Tailwind CSS**
-- **SQLite** via `better-sqlite3` (data stored in `./data/bingeist.db`)
+- **Postgres** via `pg` (hosted on Neon or any Postgres provider)
 - **JWT** via `jose`
 - **bcryptjs** for password hashing
 - **TMDB API** for movies & TV
@@ -94,6 +127,6 @@ src/
 │   └── useAuth.tsx     # AuthContext + useAuth hook
 └── lib/
     ├── auth.ts         # JWT helpers
-    ├── db.ts           # SQLite setup
+    ├── db.ts           # Postgres pool + schema init
     └── media.ts        # TMDB + Jikan API clients
 ```
