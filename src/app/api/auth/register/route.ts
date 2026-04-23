@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import getDb from '@/lib/db';
+import pool, { ensureSchema } from '@/lib/db';
 import { signToken, COOKIE_NAME } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
@@ -23,18 +23,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
     }
 
-    const db = getDb();
-    const existing = db.prepare('SELECT id FROM users WHERE email = ? OR username = ?').get(email, username);
-    if (existing) {
+    await ensureSchema();
+    const { rows: existing } = await pool.query(
+      'SELECT id FROM users WHERE email = $1 OR username = $2',
+      [email, username]
+    );
+    if (existing.length > 0) {
       return NextResponse.json({ error: 'Email or username already in use' }, { status: 409 });
     }
 
     const hash = await bcrypt.hash(password, 12);
-    const result = db.prepare(
-      'INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)'
-    ).run(username, email, hash);
+    const { rows } = await pool.query<{ id: number }>(
+      'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id',
+      [username, email, hash]
+    );
+    const newUser = rows[0];
 
-    const token = await signToken({ userId: result.lastInsertRowid as number, username });
+    const token = await signToken({ userId: newUser.id, username });
 
     const res = NextResponse.json({ message: 'Account created', username }, { status: 201 });
     res.cookies.set(COOKIE_NAME, token, {

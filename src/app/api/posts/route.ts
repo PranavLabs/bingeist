@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import getDb from '@/lib/db';
+import pool, { ensureSchema } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
@@ -12,19 +12,38 @@ export async function GET(req: NextRequest) {
   }
 
   const session = await getSessionUser();
-  const db = getDb();
+  await ensureSchema();
 
-  const posts = db.prepare(`
-    SELECT p.*, u.username, u.avatar_url,
-      (SELECT COUNT(*) FROM replies r WHERE r.post_id = p.id) as reply_count,
-      (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) as like_count
-      ${session ? ', (SELECT COUNT(*) FROM post_likes pl2 WHERE pl2.post_id = p.id AND pl2.user_id = ?) as user_liked' : ''}
-    FROM posts p
-    JOIN users u ON u.id = p.user_id
-    WHERE p.media_id = ? AND p.media_type = ?
-    ORDER BY p.created_at DESC
-    LIMIT 50
-  `).all(...(session ? [session.userId] : []), media_id, media_type);
+  let posts;
+  if (session) {
+    const { rows } = await pool.query(
+      `SELECT p.*, u.username, u.avatar_url,
+        (SELECT COUNT(*) FROM replies r WHERE r.post_id = p.id)::int AS reply_count,
+        (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id)::int AS like_count,
+        (SELECT COUNT(*) FROM post_likes pl2 WHERE pl2.post_id = p.id AND pl2.user_id = $1)::int AS user_liked
+       FROM posts p
+       JOIN users u ON u.id = p.user_id
+       WHERE p.media_id = $2 AND p.media_type = $3
+       ORDER BY p.created_at DESC
+       LIMIT 50`,
+      [session.userId, media_id, media_type]
+    );
+    posts = rows;
+  } else {
+    const { rows } = await pool.query(
+      `SELECT p.*, u.username, u.avatar_url,
+        (SELECT COUNT(*) FROM replies r WHERE r.post_id = p.id)::int AS reply_count,
+        (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id)::int AS like_count,
+        0 AS user_liked
+       FROM posts p
+       JOIN users u ON u.id = p.user_id
+       WHERE p.media_id = $1 AND p.media_type = $2
+       ORDER BY p.created_at DESC
+       LIMIT 50`,
+      [media_id, media_type]
+    );
+    posts = rows;
+  }
 
   return NextResponse.json({ posts });
 }
@@ -43,15 +62,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Post content cannot exceed 2000 characters' }, { status: 400 });
   }
 
-  const db = getDb();
-  const result = db.prepare(
-    'INSERT INTO posts (user_id, media_id, media_type, media_title, content, spoiler) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(session.userId, media_id, media_type, media_title, content.trim(), spoiler ? 1 : 0);
+  await ensureSchema();
+  const { rows: inserted } = await pool.query<{ id: number }>(
+    'INSERT INTO posts (user_id, media_id, media_type, media_title, content, spoiler) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+    [session.userId, media_id, media_type, media_title, content.trim(), spoiler ? true : false]
+  );
 
-  const post = db.prepare(`
-    SELECT p.*, u.username, u.avatar_url, 0 as reply_count, 0 as like_count, 0 as user_liked
-    FROM posts p JOIN users u ON u.id = p.user_id WHERE p.id = ?
-  `).get(result.lastInsertRowid);
+  const { rows } = await pool.query(
+    `SELECT p.*, u.username, u.avatar_url, 0 AS reply_count, 0 AS like_count, 0 AS user_liked
+     FROM posts p JOIN users u ON u.id = p.user_id WHERE p.id = $1`,
+    [inserted[0].id]
+  );
 
-  return NextResponse.json({ post }, { status: 201 });
+  return NextResponse.json({ post: rows[0] }, { status: 201 });
 }

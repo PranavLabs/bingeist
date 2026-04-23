@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import getDb from '@/lib/db';
+import pool, { ensureSchema } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
 
 export async function GET(
@@ -7,15 +7,16 @@ export async function GET(
   { params }: { params: Promise<{ postId: string }> }
 ) {
   const { postId } = await params;
-  const db = getDb();
+  await ensureSchema();
 
-  const replies = db.prepare(`
-    SELECT r.*, u.username, u.avatar_url
-    FROM replies r
-    JOIN users u ON u.id = r.user_id
-    WHERE r.post_id = ?
-    ORDER BY r.created_at ASC
-  `).all(postId);
+  const { rows: replies } = await pool.query(
+    `SELECT r.*, u.username, u.avatar_url
+     FROM replies r
+     JOIN users u ON u.id = r.user_id
+     WHERE r.post_id = $1
+     ORDER BY r.created_at ASC`,
+    [postId]
+  );
 
   return NextResponse.json({ replies });
 }
@@ -38,18 +39,20 @@ export async function POST(
     return NextResponse.json({ error: 'Reply cannot exceed 1000 characters' }, { status: 400 });
   }
 
-  const db = getDb();
-  const post = db.prepare('SELECT id FROM posts WHERE id = ?').get(postId);
-  if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
+  await ensureSchema();
+  const { rows: postRows } = await pool.query('SELECT id FROM posts WHERE id = $1', [postId]);
+  if (!postRows[0]) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
 
-  const result = db.prepare(
-    'INSERT INTO replies (post_id, user_id, content) VALUES (?, ?, ?)'
-  ).run(postId, session.userId, content.trim());
+  const { rows: inserted } = await pool.query<{ id: number }>(
+    'INSERT INTO replies (post_id, user_id, content) VALUES ($1, $2, $3) RETURNING id',
+    [postId, session.userId, content.trim()]
+  );
 
-  const reply = db.prepare(`
-    SELECT r.*, u.username, u.avatar_url
-    FROM replies r JOIN users u ON u.id = r.user_id WHERE r.id = ?
-  `).get(result.lastInsertRowid);
+  const { rows } = await pool.query(
+    `SELECT r.*, u.username, u.avatar_url
+     FROM replies r JOIN users u ON u.id = r.user_id WHERE r.id = $1`,
+    [inserted[0].id]
+  );
 
-  return NextResponse.json({ reply }, { status: 201 });
+  return NextResponse.json({ reply: rows[0] }, { status: 201 });
 }
