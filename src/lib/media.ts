@@ -222,6 +222,7 @@ export async function getTrendingMovies(): Promise<MediaItem[]> {
   // OMDb has no trending endpoint. We approximate "popular movies" by fetching
   // a curated list of well-known recent IMDb IDs in parallel. These cover
   // blockbusters and critically acclaimed films from the last few years.
+  // NOTE: Update this list periodically (e.g. quarterly) to keep content relevant.
   const popularImdbIds = [
     'tt15398776', // Oppenheimer (2023)
     'tt1517268',  // Barbie (2023)

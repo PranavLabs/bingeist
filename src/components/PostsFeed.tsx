@@ -47,6 +47,14 @@ function timeAgo(dateStr: string) {
 }
 
 function AttachedImage({ url }: { url: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <p className="mt-2 text-xs text-gray-600 italic">Image failed to load.</p>
+    );
+  }
+
   return (
     <div className="mt-2 rounded-lg overflow-hidden border border-gray-700 max-w-sm">
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -54,7 +62,7 @@ function AttachedImage({ url }: { url: string }) {
         src={url}
         alt="Attached image"
         className="w-full h-auto max-h-64 object-contain bg-gray-900"
-        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        onError={() => setFailed(true)}
       />
     </div>
   );
