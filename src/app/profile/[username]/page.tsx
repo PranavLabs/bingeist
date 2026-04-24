@@ -20,6 +20,12 @@ interface Stats {
   posts: number;
 }
 
+interface WatchTime {
+  totalMinutes: number;
+  totalHours: number;
+  isEstimated: boolean;
+}
+
 interface WatchlistItem {
   id: number;
   media_id: string;
@@ -35,6 +41,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [username, setUsername] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [watchTime, setWatchTime] = useState<WatchTime | null>(null);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -59,6 +66,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         const data = await profileRes.json();
         setProfile(data.user);
         setStats(data.stats);
+        if (data.watchTime) setWatchTime(data.watchTime);
         setEditForm({ bio: data.user.bio || '', avatar_url: data.user.avatar_url || '' });
       }
 
@@ -126,7 +134,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Profile header */}
-      <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-6 mb-6">
+      <div className="glass-card glass-noise rounded-2xl p-6 mb-6">
         <div className="flex items-start gap-4">
           <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-500/40 flex items-center justify-center text-2xl font-bold text-emerald-400 flex-shrink-0 overflow-hidden">
             {profile.avatar_url ? (
@@ -202,18 +210,31 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
       {/* Stats */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
           {[
             { label: 'Watching', value: stats.watching, color: 'text-blue-400' },
             { label: 'Completed', value: stats.completed, color: 'text-emerald-400' },
             { label: 'Plan to Watch', value: stats.plan_to_watch, color: 'text-yellow-400' },
             { label: 'Posts', value: stats.posts, color: 'text-purple-400' },
           ].map(s => (
-            <div key={s.label} className="bg-gray-900/50 border border-gray-800 rounded-xl p-4 text-center">
+            <div key={s.label} className="glass-card glass-noise rounded-xl p-4 text-center">
               <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
               <div className="text-xs text-gray-500 mt-1">{s.label}</div>
             </div>
           ))}
+          {watchTime && (
+            <div className="glass-card glass-noise rounded-xl p-4 text-center col-span-2 md:col-span-1">
+              <div className="text-2xl font-bold text-teal-400">
+                {watchTime.totalHours}h
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                {watchTime.isEstimated ? 'Est. Hours Watched' : 'Hours Watched'}
+              </div>
+              {watchTime.isEstimated && (
+                <div className="text-[10px] text-gray-600 mt-0.5">estimated</div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

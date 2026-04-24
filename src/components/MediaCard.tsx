@@ -12,6 +12,7 @@ interface MediaCardProps {
   vote_average?: number;
   release_date?: string;
   compact?: boolean;
+  personalised?: boolean;
 }
 
 const TYPE_COLORS = {
@@ -29,14 +30,15 @@ export default function MediaCard({
   vote_average,
   release_date,
   compact = false,
+  personalised = false,
 }: MediaCardProps) {
   const href = `/media/${id}?type=${media_type}`;
   const year = release_date ? new Date(release_date).getFullYear() : null;
 
   if (compact) {
     return (
-      <Link href={href} className="flex gap-3 p-3 bg-gray-900/50 border border-gray-800 rounded-lg hover:border-emerald-500/30 transition-all group">
-        <div className="w-10 h-14 flex-shrink-0 bg-gray-800 rounded overflow-hidden">
+      <Link href={href} className="flex gap-3 p-3 glass-card rounded-xl hover:border-emerald-500/30 transition-all group">
+        <div className="w-10 h-14 flex-shrink-0 bg-gray-800 rounded-lg overflow-hidden">
           {poster_path ? (
             <Image src={poster_path} alt={title} width={40} height={56} className="object-cover w-full h-full" unoptimized />
           ) : (
@@ -55,39 +57,55 @@ export default function MediaCard({
   }
 
   return (
-    <Link href={href} className="group bg-gray-900/50 border border-gray-800 rounded-xl overflow-hidden hover:border-emerald-500/30 transition-all hover:shadow-lg hover:shadow-emerald-500/5">
-      <div className="aspect-[2/3] bg-gray-800 relative overflow-hidden">
+    <Link
+      href={href}
+      className="group glass-card glass-noise rounded-2xl overflow-hidden hover:border-emerald-500/40 transition-all hover:shadow-xl hover:shadow-emerald-500/10 hover:-translate-y-0.5"
+    >
+      <div className="aspect-[2/3] bg-gray-800/80 relative overflow-hidden">
         {poster_path ? (
           <Image
             src={poster_path}
             alt={title}
             fill
-            className="object-cover group-hover:scale-105 transition-transform duration-300"
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
             unoptimized
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-600 text-4xl">🎬</div>
         )}
-        <div className="absolute top-2 left-2">
-          <span className={`text-[10px] px-2 py-0.5 rounded border ${TYPE_COLORS[media_type]} uppercase font-medium backdrop-blur-sm`}>
+
+        {/* Top badges row */}
+        <div className="absolute top-2 left-2 flex flex-col gap-1">
+          <span className={`text-[10px] px-2 py-0.5 rounded-full border glass-badge ${TYPE_COLORS[media_type]} uppercase font-semibold tracking-wide`}>
             {media_type}
           </span>
+          {personalised && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full border bg-emerald-500/20 text-emerald-300 border-emerald-400/30 glass-badge font-semibold tracking-wide">
+              ✦ For You
+            </span>
+          )}
         </div>
+
         {vote_average !== undefined && vote_average > 0 && (
-          <div className="absolute bottom-2 right-2 bg-black/70 backdrop-blur-sm text-yellow-400 text-xs px-2 py-0.5 rounded font-medium">
+          <div className="absolute bottom-2 right-2 glass-badge text-yellow-300 text-xs px-2 py-0.5 rounded-full font-semibold">
             ★ {vote_average.toFixed(1)}
           </div>
         )}
+
+        {/* Gradient overlay at bottom */}
+        <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/60 to-transparent" />
       </div>
-      <div className="p-3">
+
+      <div className="p-3 space-y-1">
         <h3 className="font-semibold text-gray-200 group-hover:text-emerald-400 transition-colors text-sm leading-tight line-clamp-2">
           {title}
         </h3>
-        {year && <p className="text-xs text-gray-500 mt-1">{year}</p>}
+        {year && <p className="text-xs text-gray-500">{year}</p>}
         {overview && (
-          <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-relaxed">{overview}</p>
+          <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{overview}</p>
         )}
       </div>
     </Link>
   );
 }
+

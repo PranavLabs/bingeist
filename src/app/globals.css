@@ -3,6 +3,9 @@
 :root {
   --background: #0a0a0a;
   --foreground: #e0e0e0;
+  --glass-bg: rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-highlight: rgba(255, 255, 255, 0.06);
 }
 
 @theme inline {
@@ -12,6 +15,67 @@
 
 .glow {
   text-shadow: 0 0 10px rgba(0, 255, 170, 0.5);
+}
+
+.glow-sm {
+  text-shadow: 0 0 6px rgba(0, 255, 170, 0.35);
+}
+
+/* Liquid glass card */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  border: 1px solid var(--glass-border);
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255,255,255,0.06) 0%,
+    transparent 50%,
+    rgba(255,255,255,0.02) 100%
+  );
+  pointer-events: none;
+}
+
+/* Noise texture overlay for glass */
+.glass-noise::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Glass pill badge */
+.glass-badge {
+  background: rgba(255,255,255,0.07);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+/* Gradient mesh background for hero */
+.mesh-bg {
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 30%, rgba(16, 185, 129, 0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 60% at 80% 70%, rgba(139, 92, 246, 0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 50% at 50% 50%, rgba(236, 72, 153, 0.04) 0%, transparent 70%);
+}
+
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .line-clamp-2 {
@@ -33,3 +97,4 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
