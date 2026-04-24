@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool, { ensureSchema } from '@/lib/db';
 import { getSessionUser } from '@/lib/auth';
+import { getMediaRuntimeMinutes } from '@/lib/media';
 
 export async function GET(
   _req: NextRequest,
@@ -23,11 +24,15 @@ export async function GET(
 
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-  const [watchingRes, completedRes, planRes, postsRes] = await Promise.all([
+  const [watchingRes, completedRes, planRes, postsRes, watchlistRes] = await Promise.all([
     pool.query<{ c: string }>("SELECT COUNT(*) AS c FROM watchlist_items WHERE user_id = $1 AND status = 'watching'", [user.id]),
     pool.query<{ c: string }>("SELECT COUNT(*) AS c FROM watchlist_items WHERE user_id = $1 AND status = 'completed'", [user.id]),
     pool.query<{ c: string }>("SELECT COUNT(*) AS c FROM watchlist_items WHERE user_id = $1 AND status = 'plan_to_watch'", [user.id]),
     pool.query<{ c: string }>('SELECT COUNT(*) AS c FROM posts WHERE user_id = $1', [user.id]),
+    pool.query<{ media_id: string; media_type: string }>(
+      "SELECT media_id, media_type FROM watchlist_items WHERE user_id = $1 AND status IN ('watching','completed')",
+      [user.id]
+    ),
   ]);
 
   const stats = {
@@ -37,7 +42,32 @@ export async function GET(
     posts: parseInt(postsRes.rows[0].c, 10),
   };
 
-  return NextResponse.json({ user, stats });
+  // Compute total watch time from watched/watching items
+  let totalMinutes = 0;
+  let isEstimated = false;
+  if (watchlistRes.rows.length > 0) {
+    const runtimes = await Promise.allSettled(
+      watchlistRes.rows.map(row =>
+        getMediaRuntimeMinutes(row.media_id, row.media_type as 'movie' | 'tv' | 'anime')
+      )
+    );
+    for (const r of runtimes) {
+      if (r.status === 'fulfilled' && r.value) {
+        totalMinutes += r.value.minutes;
+        if (r.value.estimated) isEstimated = true;
+      } else {
+        isEstimated = true;
+      }
+    }
+  }
+
+  const watchTime = {
+    totalMinutes,
+    totalHours: parseFloat((totalMinutes / 60).toFixed(1)),
+    isEstimated,
+  };
+
+  return NextResponse.json({ user, stats, watchTime });
 }
 
 export async function PATCH(
