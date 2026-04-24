@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { searchTMDB, searchJikan } from '@/lib/media';
+import { searchTVMaze, searchOMDb, searchJikan } from '@/lib/media';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -11,16 +11,13 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const tmdbPromise = (type === 'all' || type === 'movie' || type === 'tv') ? searchTMDB(query) : Promise.resolve([]);
+    const tvPromise = (type === 'all' || type === 'tv') ? searchTVMaze(query) : Promise.resolve([]);
+    const moviePromise = (type === 'all' || type === 'movie') ? searchOMDb(query) : Promise.resolve([]);
     const animePromise = (type === 'all' || type === 'anime') ? searchJikan(query) : Promise.resolve([]);
 
-    const [tmdbResults, animeResults] = await Promise.all([tmdbPromise, animePromise]);
+    const [tvResults, movieResults, animeResults] = await Promise.all([tvPromise, moviePromise, animePromise]);
 
-    let results = [...tmdbResults, ...animeResults];
-
-    if (type === 'movie') results = results.filter(r => r.media_type === 'movie');
-    else if (type === 'tv') results = results.filter(r => r.media_type === 'tv');
-    else if (type === 'anime') results = results.filter(r => r.media_type === 'anime');
+    const results = [...movieResults, ...tvResults, ...animeResults];
 
     return NextResponse.json({ results });
   } catch (err) {

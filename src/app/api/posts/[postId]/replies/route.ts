@@ -21,6 +21,15 @@ export async function GET(
   return NextResponse.json({ replies });
 }
 
+function isValidImageUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ postId: string }> }
@@ -29,7 +38,7 @@ export async function POST(
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { postId } = await params;
-  const { content } = await req.json();
+  const { content, image_url } = await req.json();
 
   if (!content?.trim()) {
     return NextResponse.json({ error: 'Content is required' }, { status: 400 });
@@ -39,13 +48,18 @@ export async function POST(
     return NextResponse.json({ error: 'Reply cannot exceed 1000 characters' }, { status: 400 });
   }
 
+  const cleanImageUrl = image_url?.trim() || null;
+  if (cleanImageUrl && !isValidImageUrl(cleanImageUrl)) {
+    return NextResponse.json({ error: 'image_url must be a valid https:// URL' }, { status: 400 });
+  }
+
   await ensureSchema();
   const { rows: postRows } = await pool.query('SELECT id FROM posts WHERE id = $1', [postId]);
   if (!postRows[0]) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
 
   const { rows: inserted } = await pool.query<{ id: number }>(
-    'INSERT INTO replies (post_id, user_id, content) VALUES ($1, $2, $3) RETURNING id',
-    [postId, session.userId, content.trim()]
+    'INSERT INTO replies (post_id, user_id, content, image_url) VALUES ($1, $2, $3, $4) RETURNING id',
+    [postId, session.userId, content.trim(), cleanImageUrl]
   );
 
   const { rows } = await pool.query(

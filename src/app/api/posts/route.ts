@@ -48,11 +48,20 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ posts });
 }
 
+function isValidImageUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
   const session = await getSessionUser();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { media_id, media_type, media_title, content, spoiler } = await req.json();
+  const { media_id, media_type, media_title, content, spoiler, image_url } = await req.json();
 
   if (!media_id || !media_type || !media_title || !content?.trim()) {
     return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
@@ -62,10 +71,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Post content cannot exceed 2000 characters' }, { status: 400 });
   }
 
+  const cleanImageUrl = image_url?.trim() || null;
+  if (cleanImageUrl && !isValidImageUrl(cleanImageUrl)) {
+    return NextResponse.json({ error: 'image_url must be a valid https:// URL' }, { status: 400 });
+  }
+
   await ensureSchema();
   const { rows: inserted } = await pool.query<{ id: number }>(
-    'INSERT INTO posts (user_id, media_id, media_type, media_title, content, spoiler) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
-    [session.userId, media_id, media_type, media_title, content.trim(), spoiler ? true : false]
+    'INSERT INTO posts (user_id, media_id, media_type, media_title, content, spoiler, image_url) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+    [session.userId, media_id, media_type, media_title, content.trim(), spoiler ? true : false, cleanImageUrl]
   );
 
   const { rows } = await pool.query(
