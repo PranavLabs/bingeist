@@ -47,6 +47,7 @@ export async function ensureSchema(): Promise<void> {
       media_title TEXT NOT NULL,
       content TEXT NOT NULL,
       spoiler BOOLEAN NOT NULL DEFAULT FALSE,
+      image_url TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
@@ -55,6 +56,7 @@ export async function ensureSchema(): Promise<void> {
       post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       content TEXT NOT NULL,
+      image_url TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
@@ -64,6 +66,13 @@ export async function ensureSchema(): Promise<void> {
       PRIMARY KEY (user_id, post_id)
     );
   `);
+
+  // Migrate existing databases: add image_url columns if they don't exist yet
+  await pool.query(`
+    ALTER TABLE posts ADD COLUMN IF NOT EXISTS image_url TEXT;
+    ALTER TABLE replies ADD COLUMN IF NOT EXISTS image_url TEXT;
+  `);
+
   schemaInitialized = true;
 }
 

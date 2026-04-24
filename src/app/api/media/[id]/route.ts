@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTMDBMedia, getJikanAnime } from '@/lib/media';
+import { getTVMazeShow, getOMDbMovie, getJikanAnime } from '@/lib/media';
 
 export async function GET(
   _req: NextRequest,
@@ -15,8 +15,10 @@ export async function GET(
     if (type === 'anime') {
       const malId = id.startsWith('mal_') ? id.slice(4) : id;
       media = await getJikanAnime(malId);
+    } else if (type === 'tv') {
+      media = await getTVMazeShow(id);
     } else {
-      media = await getTMDBMedia(id, type);
+      media = await getOMDbMovie(id);
     }
 
     if (!media) return NextResponse.json({ error: 'Not found' }, { status: 404 });

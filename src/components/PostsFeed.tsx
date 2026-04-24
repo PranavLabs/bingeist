@@ -11,6 +11,7 @@ interface Post {
   media_type: string;
   content: string;
   spoiler: number;
+  image_url?: string | null;
   created_at: string;
   username: string;
   avatar_url: string;
@@ -22,6 +23,7 @@ interface Post {
 interface Reply {
   id: number;
   content: string;
+  image_url?: string | null;
   created_at: string;
   username: string;
   avatar_url: string;
@@ -44,12 +46,36 @@ function timeAgo(dateStr: string) {
   return new Date(dateStr + 'Z').toLocaleDateString();
 }
 
+function AttachedImage({ url }: { url: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <p className="mt-2 text-xs text-gray-600 italic">Image failed to load.</p>
+    );
+  }
+
+  return (
+    <div className="mt-2 rounded-lg overflow-hidden border border-gray-700 max-w-sm">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={url}
+        alt="Attached image"
+        className="w-full h-auto max-h-64 object-contain bg-gray-900"
+        onError={() => setFailed(true)}
+      />
+    </div>
+  );
+}
+
 function PostThread({ post, onLikeToggle }: PostThreadProps) {
   const { user } = useAuth();
   const [showReplies, setShowReplies] = useState(false);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [loadingReplies, setLoadingReplies] = useState(false);
   const [replyText, setReplyText] = useState('');
+  const [replyImageUrl, setReplyImageUrl] = useState('');
+  const [showReplyImageInput, setShowReplyImageInput] = useState(false);
   const [submittingReply, setSubmittingReply] = useState(false);
   const [revealed, setRevealed] = useState(!post.spoiler);
 
@@ -69,12 +95,14 @@ function PostThread({ post, onLikeToggle }: PostThreadProps) {
     const res = await fetch(`/api/posts/${post.id}/replies`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: replyText.trim() }),
+      body: JSON.stringify({ content: replyText.trim(), image_url: replyImageUrl.trim() || undefined }),
     });
     if (res.ok) {
       const data = await res.json();
       setReplies(prev => [...prev, data.reply]);
       setReplyText('');
+      setReplyImageUrl('');
+      setShowReplyImageInput(false);
       setShowReplies(true);
     }
     setSubmittingReply(false);
@@ -122,7 +150,10 @@ function PostThread({ post, onLikeToggle }: PostThreadProps) {
               <p className="text-gray-500 text-sm italic">This post contains spoilers. Click to reveal.</p>
             </div>
           ) : (
-            <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap break-words">{post.content}</p>
+            <>
+              <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap break-words">{post.content}</p>
+              {post.image_url && <AttachedImage url={post.image_url} />}
+            </>
           )}
 
           <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
@@ -159,6 +190,7 @@ function PostThread({ post, onLikeToggle }: PostThreadProps) {
                       <span className="text-xs text-gray-600">{timeAgo(reply.created_at)}</span>
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{reply.content}</p>
+                    {reply.image_url && <AttachedImage url={reply.image_url} />}
                   </div>
                 </div>
               ))}
@@ -166,22 +198,40 @@ function PostThread({ post, onLikeToggle }: PostThreadProps) {
           )}
 
           {user && showReplies && (
-            <div className="mt-3 flex gap-2">
-              <input
-                value={replyText}
-                onChange={e => setReplyText(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && submitReply()}
-                placeholder="Write a reply..."
-                maxLength={1000}
-                className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-300 placeholder-gray-600 outline-none focus:border-emerald-500/50 transition-colors"
-              />
-              <button
-                onClick={submitReply}
-                disabled={submittingReply || !replyText.trim()}
-                className="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-lg hover:bg-emerald-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Reply
-              </button>
+            <div className="mt-3 space-y-2">
+              <div className="flex gap-2">
+                <input
+                  value={replyText}
+                  onChange={e => setReplyText(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && submitReply()}
+                  placeholder="Write a reply..."
+                  maxLength={1000}
+                  className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-300 placeholder-gray-600 outline-none focus:border-emerald-500/50 transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowReplyImageInput(v => !v)}
+                  title="Attach image/GIF URL"
+                  className={`text-xs border px-2 py-1.5 rounded-lg transition-colors ${showReplyImageInput ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-gray-800/50 border-gray-700 text-gray-500 hover:text-gray-300'}`}
+                >
+                  🖼
+                </button>
+                <button
+                  onClick={submitReply}
+                  disabled={submittingReply || !replyText.trim()}
+                  className="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-lg hover:bg-emerald-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Reply
+                </button>
+              </div>
+              {showReplyImageInput && (
+                <input
+                  value={replyImageUrl}
+                  onChange={e => setReplyImageUrl(e.target.value)}
+                  placeholder="Paste image/GIF URL (https://...)"
+                  className="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-300 placeholder-gray-600 outline-none focus:border-emerald-500/50 transition-colors"
+                />
+              )}
             </div>
           )}
         </div>
@@ -201,6 +251,8 @@ export default function PostsFeed({ mediaId, mediaType, mediaTitle }: PostsFeedP
   const [posts, setPosts] = useState<Post[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [newPost, setNewPost] = useState('');
+  const [postImageUrl, setPostImageUrl] = useState('');
+  const [showImageInput, setShowImageInput] = useState(false);
   const [spoiler, setSpoiler] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -220,12 +272,21 @@ export default function PostsFeed({ mediaId, mediaType, mediaTitle }: PostsFeedP
     const res = await fetch('/api/posts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ media_id: mediaId, media_type: mediaType, media_title: mediaTitle, content: newPost.trim(), spoiler }),
+      body: JSON.stringify({
+        media_id: mediaId,
+        media_type: mediaType,
+        media_title: mediaTitle,
+        content: newPost.trim(),
+        spoiler,
+        image_url: postImageUrl.trim() || undefined,
+      }),
     });
     if (res.ok) {
       const data = await res.json();
       setPosts(prev => [data.post, ...prev]);
       setNewPost('');
+      setPostImageUrl('');
+      setShowImageInput(false);
       setSpoiler(false);
     }
     setSubmitting(false);
@@ -251,16 +312,34 @@ export default function PostsFeed({ mediaId, mediaType, mediaTitle }: PostsFeedP
             rows={3}
             className="w-full bg-transparent text-sm text-gray-300 placeholder-gray-600 outline-none resize-none"
           />
+          {showImageInput && (
+            <input
+              value={postImageUrl}
+              onChange={e => setPostImageUrl(e.target.value)}
+              placeholder="Paste image/GIF URL (https://...)"
+              className="w-full mt-2 bg-gray-800/50 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-300 placeholder-gray-600 outline-none focus:border-emerald-500/50 transition-colors"
+            />
+          )}
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-800">
-            <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={spoiler}
-                onChange={e => setSpoiler(e.target.checked)}
-                className="accent-yellow-400"
-              />
-              Mark as spoiler
-            </label>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={spoiler}
+                  onChange={e => setSpoiler(e.target.checked)}
+                  className="accent-yellow-400"
+                />
+                Mark as spoiler
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowImageInput(v => !v)}
+                title="Attach image/GIF URL"
+                className={`text-xs border px-2 py-1 rounded-lg transition-colors ${showImageInput ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-gray-800/50 border-gray-700 text-gray-500 hover:text-gray-300'}`}
+              >
+                🖼 Image/GIF
+              </button>
+            </div>
             <div className="flex items-center gap-3">
               <span className="text-xs text-gray-600">{newPost.length}/2000</span>
               <button
@@ -300,3 +379,4 @@ export default function PostsFeed({ mediaId, mediaType, mediaTitle }: PostsFeedP
     </div>
   );
 }
+
