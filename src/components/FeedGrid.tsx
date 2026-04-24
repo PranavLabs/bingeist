@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';import MediaCard from './MediaCard';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import MediaCard from './MediaCard';
 
 interface FeedItem {
   id: string;

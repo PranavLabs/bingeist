@@ -17,18 +17,18 @@ export async function GET(req: NextRequest) {
 
   try {
     // Fetch the full candidate pool (cached by Next.js)
-    let pool_items = await getFeedPool();
+    let poolItems = await getFeedPool();
 
     // Apply type filter
     if (typeFilter !== 'all') {
-      pool_items = pool_items.filter(i => i.media_type === typeFilter);
+      poolItems = poolItems.filter(i => i.media_type === typeFilter);
     }
 
     // Apply genre filter (any match)
     if (genreFilter) {
       const wanted = genreFilter.split(',').map(g => g.trim().toLowerCase()).filter(Boolean);
       if (wanted.length > 0) {
-        pool_items = pool_items.filter(item =>
+        poolItems = poolItems.filter(item =>
           (item.genres ?? []).some(g => wanted.includes(g.toLowerCase()))
         );
       }
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     // Apply language filter
     if (langFilter) {
       const wantedLang = langFilter.toLowerCase();
-      pool_items = pool_items.filter(item =>
+      poolItems = poolItems.filter(item =>
         item.language?.toLowerCase().includes(wantedLang)
       );
     }
@@ -56,9 +56,9 @@ export async function GET(req: NextRequest) {
         );
 
         if (watchlist.length > 0) {
-          // We use the pool_items we already have (pre-fetched) to get genres/overviews
+          // Use the poolItems we already have (pre-fetched) to get genres/overviews
           // for items in the watchlist where possible (avoids extra API calls)
-          const poolMap = new Map(pool_items.map(i => [i.id, i]));
+          const poolMap = new Map(poolItems.map(i => [i.id, i]));
           const wlEntries = watchlist.map((row: { media_id: string; media_type: string }) => {
             const found = poolMap.get(row.media_id);
             return {
@@ -76,15 +76,15 @@ export async function GET(req: NextRequest) {
 
     // Score items
     const scored = userProfile
-      ? scoreItems(pool_items, userProfile)
-      : pool_items.map(item => ({ item, score: 0, personalised: false }));
+      ? scoreItems(poolItems, userProfile)
+      : poolItems.map(item => ({ item, score: 0, personalised: false }));
 
     // Sort: personalised first (by score desc), then the rest
     scored.sort((a, b) => b.score - a.score);
 
     // Collect all available genres and languages for filter UI
-    const allGenres = [...new Set(pool_items.flatMap(i => i.genres ?? []))].sort();
-    const allLanguages = [...new Set(pool_items.map(i => i.language).filter(Boolean) as string[])].sort();
+    const allGenres = [...new Set(poolItems.flatMap(i => i.genres ?? []))].sort();
+    const allLanguages = [...new Set(poolItems.map(i => i.language).filter(Boolean) as string[])].sort();
 
     // Paginate
     const page = scored.slice(cursor, cursor + limit);
