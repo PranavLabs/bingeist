@@ -23,7 +23,7 @@ const TYPE_FILTERS = [
 
 export default function FeedGrid() {
   const [items, setItems] = useState<FeedItem[]>([]);
-  const [cursor, setCursor] = useState(0);
+  const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
@@ -39,7 +39,7 @@ export default function FeedGrid() {
   const loaderRef = useRef<HTMLDivElement>(null);
 
   const fetchPage = useCallback(async (
-    newCursor: number,
+    newCursor: string | null,
     type: string,
     genres: string[],
     lang: string,
@@ -48,11 +48,8 @@ export default function FeedGrid() {
     if (loading) return;
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        cursor: String(newCursor),
-        limit: '20',
-        type,
-      });
+      const params = new URLSearchParams({ limit: '20', type });
+      if (newCursor) params.set('cursor', newCursor);
       if (genres.length > 0) params.set('genre', genres.join(','));
       if (lang) params.set('language', lang);
 
@@ -65,12 +62,12 @@ export default function FeedGrid() {
       } else {
         setItems(prev => [...prev, ...(data.items ?? [])]);
       }
-      setCursor(data.nextCursor ?? newCursor + 20);
+      setCursor(data.nextCursor ?? null);
       setHasMore(data.hasMore ?? false);
 
       // Populate filter options on first load
-      if (newCursor === 0 && data.allGenres) setAllGenres(data.allGenres);
-      if (newCursor === 0 && data.allLanguages) setAllLanguages(data.allLanguages);
+      if (!newCursor && data.allGenres) setAllGenres(data.allGenres);
+      if (!newCursor && data.allLanguages) setAllLanguages(data.allLanguages);
     } catch {
       // silently fail; keep existing items
     }
@@ -84,7 +81,7 @@ export default function FeedGrid() {
     if (hasInitialized.current) return;
     hasInitialized.current = true;
     // Schedule async so React batches renders cleanly
-    Promise.resolve().then(() => fetchPage(0, 'all', [], '', true));
+    Promise.resolve().then(() => fetchPage(null, 'all', [], '', true));
   }, [fetchPage]);
 
   // Re-fetch when filters change
@@ -97,10 +94,10 @@ export default function FeedGrid() {
     setGenreFilter(newGenres);
     setLangFilter(newLang);
     setItems([]);
-    setCursor(0);
+    setCursor(null);
     setHasMore(true);
     setInitialLoad(true);
-    fetchPage(0, newType, newGenres, newLang, true);
+    fetchPage(null, newType, newGenres, newLang, true);
   };
 
   // Infinite scroll observer

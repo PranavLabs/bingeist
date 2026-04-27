@@ -81,7 +81,7 @@ export default function MediaCard({
           </span>
           {personalised && (
             <span className="text-[10px] px-2 py-0.5 rounded-full border bg-emerald-500/20 text-emerald-300 border-emerald-400/30 glass-badge font-semibold tracking-wide">
-              ✦ For You
+              ✦ Personalised
             </span>
           )}
         </div>
