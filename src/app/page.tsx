@@ -1,10 +1,39 @@
+import type { Metadata } from 'next';
 import FeedGrid from '@/components/FeedGrid';
 import LatestActivity from '@/components/LatestActivity';
 import HomeHero from '@/components/HomeHero';
 
+const APP_URL = (process.env.APP_URL || 'https://www.bingeist.com').replace(/\/$/, '');
+
+export const metadata: Metadata = {
+  alternates: { canonical: APP_URL },
+};
+
+const websiteJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'Bingeist',
+  url: APP_URL,
+  description:
+    'Track, rate, and discover movies, TV shows, and anime. Share your watchlist and discuss with your community.',
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: {
+      '@type': 'EntryPoint',
+      urlTemplate: `${APP_URL}/search?q={search_term_string}`,
+    },
+    'query-input': 'required name=search_term_string',
+  },
+};
+
 export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+      />
+
       {/* Hero — hidden automatically when logged in (see HomeHero client component) */}
       <HomeHero />
 
@@ -38,3 +67,4 @@ export default function HomePage() {
     </div>
   );
 }
+

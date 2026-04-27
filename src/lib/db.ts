@@ -73,6 +73,20 @@ export async function ensureSchema(): Promise<void> {
     ALTER TABLE replies ADD COLUMN IF NOT EXISTS image_url TEXT;
   `);
 
+  // OAuth identities table for social login providers (Google, etc.)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS oauth_identities (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      provider TEXT NOT NULL,
+      provider_user_id TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(provider, provider_user_id)
+    );
+
+    ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+  `);
+
   schemaInitialized = true;
 }
 
