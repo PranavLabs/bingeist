@@ -42,6 +42,13 @@ OMDB_API_KEY=your_omdb_api_key_here
 
 # Random secret for JWT signing
 JWT_SECRET=your-random-secret-here
+
+# Google OAuth 2.0 credentials (optional — enables "Continue with Google")
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# Public URL of your deployment (no trailing slash)
+APP_URL=http://localhost:3000
 ```
 
 > **TVMaze** is a free public API for TV shows — no key needed.
@@ -52,7 +59,30 @@ JWT_SECRET=your-random-secret-here
 >
 > **DATABASE_URL** requires a Postgres database. For local development you can run Postgres locally or use a free hosted option like [Neon](https://neon.tech). The schema is created automatically on first request.
 
-### 3. Run the development server
+### 3. (Optional) Set up Google OAuth
+
+To enable **Continue with Google** on the login and register pages:
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create a new project (or select an existing one).
+3. Navigate to **APIs & Services → Credentials**.
+4. Click **Create Credentials → OAuth 2.0 Client ID**.
+5. Choose **Web application** as the application type.
+6. Add the following **Authorized redirect URIs**:
+   - For local development: `http://localhost:3000/api/auth/google/callback`
+   - For production: `https://www.bingeist.com/api/auth/google/callback`
+7. Click **Create**. Copy the **Client ID** and **Client Secret**.
+8. Set them in your `.env.local` (or Vercel environment variables):
+   ```
+   GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=your-client-secret
+   APP_URL=https://www.bingeist.com   # or http://localhost:3000 for local dev
+   ```
+9. On the **OAuth consent screen** tab, add your app name, logo, and the scope `email profile openid`.
+
+> **Note:** If `GOOGLE_CLIENT_ID` is not set, the "Continue with Google" button still appears but clicking it returns a 501 error. You can safely omit Google OAuth if you only want email/password auth.
+
+### 4. Run the development server
 
 ```bash
 npm run dev
@@ -60,7 +90,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-### 4. Production build
+### 5. Production build
 
 ```bash
 npm run build
@@ -92,6 +122,9 @@ npm start
    | `DATABASE_URL` | Your Neon connection string |
    | `OMDB_API_KEY` | Your OMDb API key (free at omdbapi.com) |
    | `JWT_SECRET` | A long random string (e.g. `openssl rand -hex 32`) |
+   | `APP_URL` | `https://www.bingeist.com` (your production domain) |
+   | `GOOGLE_CLIENT_ID` | *(optional)* Google OAuth Client ID |
+   | `GOOGLE_CLIENT_SECRET` | *(optional)* Google OAuth Client Secret |
 
 4. Click **Deploy**. The database schema is created automatically on first request.
 
