@@ -28,6 +28,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: appUrl, lastModified: now, changeFrequency: 'daily', priority: 1.0 },
     { url: `${appUrl}/search`, lastModified: now, changeFrequency: 'daily', priority: 0.9 },
+    { url: `${appUrl}/b`, lastModified: now, changeFrequency: 'daily', priority: 0.8 },
   ];
 
   const mediaRoutes: MetadataRoute.Sitemap = CURATED_MEDIA.map(({ id, type }) => ({
@@ -38,20 +39,46 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   let profileRoutes: MetadataRoute.Sitemap = [];
+  let communityRoutes: MetadataRoute.Sitemap = [];
+  let communityPostRoutes: MetadataRoute.Sitemap = [];
   try {
     await ensureSchema();
-    const { rows } = await pool.query<{ username: string; created_at: string }>(
+    const { rows: userRows } = await pool.query<{ username: string; created_at: string }>(
       'SELECT username, created_at FROM users ORDER BY created_at DESC LIMIT 500'
     );
-    profileRoutes = rows.map(row => ({
+    profileRoutes = userRows.map(row => ({
       url: `${appUrl}/profile/${encodeURIComponent(row.username)}`,
       lastModified: new Date(row.created_at),
       changeFrequency: 'weekly' as const,
       priority: 0.6,
     }));
+
+    const { rows: communityRows } = await pool.query<{ slug: string; created_at: string }>(
+      'SELECT slug, created_at FROM communities ORDER BY created_at DESC LIMIT 200'
+    );
+    communityRoutes = communityRows.map(row => ({
+      url: `${appUrl}/b/${encodeURIComponent(row.slug)}`,
+      lastModified: new Date(row.created_at),
+      changeFrequency: 'daily' as const,
+      priority: 0.7,
+    }));
+
+    const { rows: postRows } = await pool.query<{ id: number; community_slug: string; created_at: string }>(
+      `SELECT cp.id, c.slug AS community_slug, cp.created_at
+       FROM community_posts cp
+       JOIN communities c ON c.id = cp.community_id
+       WHERE cp.removed = FALSE
+       ORDER BY cp.created_at DESC LIMIT 500`
+    );
+    communityPostRoutes = postRows.map(row => ({
+      url: `${appUrl}/b/${encodeURIComponent(row.community_slug)}/post/${row.id}`,
+      lastModified: new Date(row.created_at),
+      changeFrequency: 'weekly' as const,
+      priority: 0.65,
+    }));
   } catch {
-    // DB may not be available at build time; skip profile routes gracefully
+    // DB may not be available at build time; skip dynamic routes gracefully
   }
 
-  return [...staticRoutes, ...mediaRoutes, ...profileRoutes];
+  return [...staticRoutes, ...mediaRoutes, ...profileRoutes, ...communityRoutes, ...communityPostRoutes];
 }
