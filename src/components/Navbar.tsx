@@ -17,6 +17,7 @@ export default function Navbar() {
 
         <div className="hidden md:flex items-center gap-6 text-sm">
           <Link href="/search" className="text-gray-400 hover:text-emerald-400 transition-colors">Search</Link>
+          <Link href="/b" className="text-gray-400 hover:text-emerald-400 transition-colors">Forums</Link>
           {user && (
             <>
               <Link href="/watchlist" className="text-gray-400 hover:text-emerald-400 transition-colors">Watchlist</Link>
@@ -61,6 +62,7 @@ export default function Navbar() {
       {user && (
         <div className="md:hidden border-t border-gray-800 px-4 py-2 flex gap-4 text-sm">
           <Link href="/search" className="text-gray-400 hover:text-emerald-400">Search</Link>
+          <Link href="/b" className="text-gray-400 hover:text-emerald-400">Forums</Link>
           <Link href="/watchlist" className="text-gray-400 hover:text-emerald-400">Watchlist</Link>
           <Link href={`/profile/${user.username}`} className="text-gray-400 hover:text-emerald-400">Profile</Link>
         </div>

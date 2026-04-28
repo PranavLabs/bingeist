@@ -95,7 +95,7 @@ export async function ensureSchema(): Promise<void> {
       title TEXT NOT NULL,
       description TEXT NOT NULL DEFAULT '',
       rules TEXT NOT NULL DEFAULT '',
-      created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
@@ -143,6 +143,11 @@ export async function ensureSchema(): Promise<void> {
       PRIMARY KEY (user_id, comment_id)
     );
   `);
+
+  // Migrate: allow NULL on communities.created_by (for when creator deletes account)
+  await pool.query(`
+    ALTER TABLE communities ALTER COLUMN created_by DROP NOT NULL;
+  `).catch(() => {/* table may not exist yet */});
 
   schemaInitialized = true;
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
@@ -31,7 +31,7 @@ interface Comment {
   created_at: string;
   username: string;
   heart_count: number;
-  user_hearted: number;
+  user_hearted: boolean;
   children?: Comment[];
 }
 
@@ -74,7 +74,7 @@ function CommentNode({
   postId: number;
   user: { username: string } | null;
   onReply: (parentId: number) => void;
-  onHeart: (id: number, current: boolean) => void;
+  onHeart: (id: number) => void;
   isMod: boolean;
   onModerate: (id: number, action: string) => void;
 }) {
@@ -93,7 +93,7 @@ function CommentNode({
             </p>
             <div className="flex items-center gap-3 mt-1.5">
               <button
-                onClick={() => onHeart(comment.id, comment.user_hearted > 0)}
+                onClick={() => onHeart(comment.id)}
                 className={`text-xs flex items-center gap-1 transition-colors ${comment.user_hearted ? 'text-red-400' : 'text-gray-600 hover:text-red-400'}`}
               >
                 ❤️ {comment.heart_count}
@@ -148,23 +148,25 @@ export default function PostPageClient({ postId }: { postId: string }) {
   const [replyTo, setReplyTo] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const fetchData = useCallback(async () => {
-    const [postRes, commentsRes] = await Promise.all([
+  useEffect(() => {
+    Promise.all([
       fetch(`/api/community-posts/${postId}`),
       fetch(`/api/community-posts/${postId}/comments`),
-    ]);
-    if (postRes.ok) {
-      const data = await postRes.json();
-      setPost(data.post);
-    }
-    if (commentsRes.ok) {
-      const data = await commentsRes.json();
-      setComments(data.comments || []);
-    }
-    setLoading(false);
+    ]).then(async ([postRes, commentsRes]) => {
+      if (postRes.ok) {
+        const data = await postRes.json();
+        setPost(data.post);
+      }
+      if (commentsRes.ok) {
+        const data = await commentsRes.json();
+        setComments((data.comments || []).map((c: Comment & { user_hearted: number | boolean }) => ({
+          ...c,
+          user_hearted: Boolean(c.user_hearted),
+        })));
+      }
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, [postId]);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleHeartPost = async () => {
     if (!user) { router.push('/login'); return; }
@@ -175,7 +177,7 @@ export default function PostPageClient({ postId }: { postId: string }) {
     }
   };
 
-  const handleHeartComment = async (id: number, currentHearted: boolean) => {
+  const handleHeartComment = async (id: number) => {
     if (!user) { router.push('/login'); return; }
     const res = await fetch(`/api/community-comments/${id}/heart`, { method: 'POST' });
     if (res.ok) {
@@ -183,7 +185,7 @@ export default function PostPageClient({ postId }: { postId: string }) {
       setComments(prev =>
         prev.map(c =>
           c.id === id
-            ? { ...c, user_hearted: data.hearted ? 1 : 0, heart_count: data.count }
+            ? { ...c, user_hearted: data.hearted, heart_count: data.count }
             : c
         )
       );
@@ -203,7 +205,7 @@ export default function PostPageClient({ postId }: { postId: string }) {
     const data = await res.json();
     setSubmitting(false);
     if (res.ok) {
-      setComments(prev => [...prev, data.comment]);
+      setComments(prev => [...prev, { ...data.comment, user_hearted: false }]);
       setCommentBody('');
       setReplyTo(null);
     }
@@ -215,7 +217,13 @@ export default function PostPageClient({ postId }: { postId: string }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action }),
     });
-    if (res.ok) fetchData();
+    if (res.ok) {
+      setPost(p => p ? {
+        ...p,
+        removed: action === 'remove' ? true : action === 'restore' ? false : p.removed,
+        locked: action === 'lock' ? true : action === 'unlock' ? false : p.locked,
+      } : p);
+    }
   };
 
   const handleModerateComment = async (id: number, action: string) => {
@@ -224,7 +232,11 @@ export default function PostPageClient({ postId }: { postId: string }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action }),
     });
-    if (res.ok) fetchData();
+    if (res.ok) {
+      setComments(prev =>
+        prev.map(c => c.id === id ? { ...c, removed: action === 'remove' } : c)
+      );
+    }
   };
 
   if (loading) {

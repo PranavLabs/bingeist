@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
@@ -25,14 +25,15 @@ export default function ForumsPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
-  const fetchCommunities = useCallback(async () => {
-    const res = await fetch('/api/communities');
-    const data = await res.json();
-    setCommunities(data.communities || []);
-    setLoading(false);
+  useEffect(() => {
+    fetch('/api/communities')
+      .then(r => r.json())
+      .then(data => {
+        setCommunities(data.communities || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, []);
-
-  useEffect(() => { fetchCommunities(); }, [fetchCommunities]);
 
   const handleJoin = async (slug: string) => {
     if (!user) { router.push('/login'); return; }

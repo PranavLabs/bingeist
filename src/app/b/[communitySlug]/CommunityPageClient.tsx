@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 interface Post {
   id: number;
@@ -16,7 +16,7 @@ interface Post {
   username: string;
   heart_count: number;
   comment_count: number;
-  user_hearted: number;
+  user_hearted: boolean;
 }
 
 interface Community {
@@ -53,17 +53,24 @@ export default function CommunityPageClient({ slug }: { slug: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [postError, setPostError] = useState('');
 
-  const fetchData = useCallback(async () => {
-    const res = await fetch(`/api/communities/${slug}`);
-    if (!res.ok) { setLoading(false); return; }
-    const data = await res.json();
-    setCommunity(data.community);
-    setPosts(data.posts || []);
-    setUserMembership(data.userMembership);
-    setLoading(false);
+  useEffect(() => {
+    fetch(`/api/communities/${slug}`)
+      .then(r => {
+        if (!r.ok) { setLoading(false); return null; }
+        return r.json();
+      })
+      .then(data => {
+        if (!data) return;
+        setCommunity(data.community);
+        setPosts((data.posts || []).map((p: Post & { user_hearted: number | boolean }) => ({
+          ...p,
+          user_hearted: Boolean(p.user_hearted),
+        })));
+        setUserMembership(data.userMembership);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, [slug]);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleJoin = async () => {
     if (!user) { router.push('/login'); return; }
